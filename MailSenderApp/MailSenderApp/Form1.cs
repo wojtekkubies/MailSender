@@ -1,4 +1,5 @@
-﻿using OfficeOpenXml;
+﻿using MailSenderApp.Class;
+using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -9,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 namespace MailSenderApp
@@ -19,7 +21,8 @@ namespace MailSenderApp
         {
             InitializeComponent();
         }
-        
+        JavaScriptSerializer jss = new JavaScriptSerializer();
+
         DataTable dt = new DataTable();
         BindingSource bd = new BindingSource();
         private void zamknijToolStripMenuItem_Click(object sender, EventArgs e)
@@ -79,7 +82,7 @@ namespace MailSenderApp
                 }
 
                 dt.Rows.Add(dr);
-            }           
+            }
             return dt;
         }
 
@@ -90,13 +93,34 @@ namespace MailSenderApp
 
         private void button3_Click(object sender, EventArgs e)
         {
-            for (int j = 0; j < dataGridView1.Rows.Count; j++ )
+            for (int j = 0; j < dataGridView1.Rows.Count; j++)
             {
                 for (int i = 1; i < dataGridView1.Rows[j].Cells.Count; i++)
                 {
                     if (dataGridView1.Rows[j].Cells.Count == 1) continue;
                     MessageBox.Show(dataGridView1.Rows[j].Cells[i].Value.ToString());
                 }
+            }
+        }
+
+        private void załadujPlikSzablonówToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string text = "";
+            DialogResult result = openFileDialog1.ShowDialog(); // Show the dialog.
+            if (result == DialogResult.OK) // Test result.
+            {
+                string file = openFileDialog1.FileName;
+                text = File.ReadAllText(file);
+            }
+            ParseDatabase(text);
+        }
+
+        public void ParseDatabase(string text)
+        {
+            RootObject items = jss.Deserialize<RootObject>(text);
+            foreach (var item in items.szablony)
+            {
+                comboBox1.Items.Add(item.Nazwa);
             }
         }
     }
