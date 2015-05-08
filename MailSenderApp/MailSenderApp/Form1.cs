@@ -3,8 +3,10 @@ using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Configuration;
 using System.Data;
 using System.Data.OleDb;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -22,9 +24,12 @@ namespace MailSenderApp
             InitializeComponent();
         }
         JavaScriptSerializer jss = new JavaScriptSerializer();
-
+        public RootObject listSzablow = new RootObject();
+        public DataTable themesDataTable = new DataTable();
         DataTable dt = new DataTable();
         BindingSource bd = new BindingSource();
+        public string szablonDoWyslania = "";
+
         private void zamknijToolStripMenuItem_Click(object sender, EventArgs e)
         {
             this.Close();
@@ -105,23 +110,73 @@ namespace MailSenderApp
 
         private void załadujPlikSzablonówToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            string text = "";
-            DialogResult result = openFileDialog1.ShowDialog(); // Show the dialog.
-            if (result == DialogResult.OK) // Test result.
-            {
-                string file = openFileDialog1.FileName;
-                text = File.ReadAllText(file);
-            }
-            ParseDatabase(text);
+            
         }
 
         public void ParseDatabase(string text)
         {
-            RootObject items = jss.Deserialize<RootObject>(text);
-            foreach (var item in items.szablony)
+            listSzablow = jss.Deserialize<RootObject>(text);            
+            foreach (var item in listSzablow.szablony)
             {
                 comboBox1.Items.Add(item.Nazwa);
             }
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            wyslijEmaile();
+        }
+
+        public void sparsujIWyslij(Dictionary<string, string> slownikWartosci, string tekst )
+        {
+            tekst.Replace('$',' ');
+            string email = "";
+            foreach (var item in slownikWartosci)
+            {
+                if (item.Key == "email")
+                {
+                    email = item.Value;
+                }
+                else
+                {
+                    tekst.Replace(item.Key,item.Value);
+                }
+            }
+            string command = "mailto:"+email+"?subject=Test&body="+tekst;
+            Process.Start(command); 
+        }
+        public void wyslijEmaile()
+        {
+            Dictionary<string, string> slownikWartosci = new Dictionary<string, string>();
+            foreach (DataGridViewRow row in dataGridView1.Rows)
+            {
+                if (Convert.ToBoolean(row.Cells[SendColumn.Name].Value) == true)
+                {
+                    for (int i = 1; i < row.Cells.Count; i++)
+                    {
+                        slownikWartosci[dataGridView1.Columns[i].HeaderText] = row.Cells[i].Value.ToString();
+                    }
+                }
+            }
+            sparsujIWyslij(slownikWartosci, szablonDoWyslania);
+        }
+
+        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            foreach (var item in listSzablow.szablony)
+            {
+                if (item.Nazwa == comboBox1.SelectedText)
+                {
+                    szablonDoWyslania = item.Tekst;
+                }
+            }
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            string databaseFilePath = ConfigurationManager.AppSettings["BazaSciezkaPlik"];
+            string text = File.ReadAllText(databaseFilePath);
+            ParseDatabase(text);
         }
     }
 }
