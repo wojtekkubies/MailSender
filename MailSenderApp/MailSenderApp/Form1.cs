@@ -1,30 +1,42 @@
 ﻿using MailSenderApp.Class;
+using MailSenderApp.Forms;
 using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Configuration;
 using System.Data;
-using System.Data.OleDb;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Net.Mail;
 using System.Text;
-using System.Threading.Tasks;
-using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 namespace MailSenderApp
 {
     public partial class Form1 : Form
     {
+        LiteHelper lhelper;
         public Form1()
         {
             InitializeComponent();
+            lhelper = new LiteHelper();
+            lhelper.CreateDbAndTableIfNotExist();
         }
-        JavaScriptSerializer jss = new JavaScriptSerializer();
-        public RootObject listSzablow = new RootObject();
+
+        public bool IsValidEmail(string emailaddress)
+        {
+            try
+            {
+                MailAddress m = new MailAddress(emailaddress);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
+
         public DataTable themesDataTable = new DataTable();
         DataTable dt = new DataTable();
         BindingSource bd = new BindingSource();
@@ -33,6 +45,38 @@ namespace MailSenderApp
         private void zamknijToolStripMenuItem_Click(object sender, EventArgs e)
         {
             this.Close();
+        }
+
+        public void ZaladujExcela(string path)
+        {
+            try
+            {
+                using (ExcelPackage pck = new ExcelPackage())
+                {
+                    using (var stream = File.OpenRead(path))
+                    {
+                        pck.Load(stream);
+                    }
+                    ExcelWorksheet ws = pck.Workbook.Worksheets.First();
+                    dt = WorksheetToDataTable(ws, true);
+                    dataGridView1.DataSource = dt;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Import failed. Original error: " + ex.Message);
+            }
+        }
+
+        private static void PodmienUstawieniaSciezkiExcela(string value)
+        {
+            string appPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string configFile = System.IO.Path.Combine(appPath, "App.config");
+            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap();
+            configFileMap.ExeConfigFilename = configFile;
+            System.Configuration.Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None);
+            config.AppSettings.Settings["ExcelPlik"].Value = value;
+            config.Save();
         }
 
         private void wczytajDaneZXLSToolStripMenuItem_Click(object sender, EventArgs e)
@@ -46,7 +90,6 @@ namespace MailSenderApp
                 {
                     using (ExcelPackage pck = new ExcelPackage())
                     {
-                        // Open the Excel file and load it to the ExcelPackage
                         using (var stream = File.OpenRead(openFileDialog1.FileName))
                         {
                             pck.Load(stream);
@@ -61,6 +104,7 @@ namespace MailSenderApp
                 {
                     MessageBox.Show("Import failed. Original error: " + ex.Message);
                 }
+                PodmienUstawieniaSciezkiExcela(openFileDialog1.FileName);
             }
         }
 
@@ -110,15 +154,17 @@ namespace MailSenderApp
 
         private void załadujPlikSzablonówToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            
+
         }
 
-        public void ParseDatabase(string text)
+        public void ParseDatabase()
         {
-            listSzablow = jss.Deserialize<RootObject>(text);            
-            foreach (var item in listSzablow.szablony)
+            comboBox1.Items.Clear();
+            List<Template> res = new List<Template>();
+            res = lhelper.GetAllTemplates();
+            foreach (var item in res)
             {
-                comboBox1.Items.Add(item.Nazwa);
+                comboBox1.Items.Add(item.TemplateName);
             }
         }
 
@@ -127,24 +173,45 @@ namespace MailSenderApp
             wyslijEmaile();
         }
 
-        public void sparsujIWyslij(Dictionary<string, string> slownikWartosci, string tekst )
+        public void sparsujIWyslij(Dictionary<string, string> slownikWartosci, string tekst)
         {
-            tekst.Replace('$',' ');
+            char[] separators = new char[] { ' ','\t','\n' };
+            string[] tab = tekst.Split(separators);
             string email = "";
+            StringBuilder tekstDoWyslania = new StringBuilder();
+            foreach (var item in tab)
+            {
+                if (item.Length > 0)
+                {
+                    if (item[0] == '$')
+                    {
+                        foreach (var item2 in slownikWartosci)
+                        {
+                            if (item2.Key == item.Substring(1, item.Length - 1))
+                            {
+                                tekstDoWyslania.Append(" " + item2.Value + " ");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        tekstDoWyslania.Append(" " + item + " ");
+                    }
+                }               
+            }
+
             foreach (var item in slownikWartosci)
             {
-                if (item.Key == "email")
+                if (IsValidEmail(item.Value))
                 {
-                    email = item.Value;
-                }
-                else
-                {
-                    tekst.Replace(item.Key,item.Value);
+                    email += item.Value + ";";
                 }
             }
-            string command = "mailto:"+email+"?subject=Test&body="+tekst;
-            Process.Start(command); 
+            email = email.Substring(0, email.Length - 2);
+            string command = "mailto:" + email + "?subject=Test&body=" + tekstDoWyslania.ToString();
+            Process.Start(command);
         }
+
         public void wyslijEmaile()
         {
             Dictionary<string, string> slownikWartosci = new Dictionary<string, string>();
@@ -156,27 +223,48 @@ namespace MailSenderApp
                     {
                         slownikWartosci[dataGridView1.Columns[i].HeaderText] = row.Cells[i].Value.ToString();
                     }
+                    sparsujIWyslij(slownikWartosci, szablonDoWyslania);
                 }
             }
-            sparsujIWyslij(slownikWartosci, szablonDoWyslania);
         }
 
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            foreach (var item in listSzablow.szablony)
+            List<Template> res = new List<Template>();
+            res = lhelper.GetAllTemplates();
+            foreach (var item in res)
             {
-                if (item.Nazwa == comboBox1.SelectedText)
+                if (item.TemplateName == comboBox1.SelectedItem.ToString())
                 {
-                    szablonDoWyslania = item.Tekst;
+                    szablonDoWyslania = item.TemplateText;
                 }
             }
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            string databaseFilePath = ConfigurationManager.AppSettings["BazaSciezkaPlik"];
-            string text = File.ReadAllText(databaseFilePath);
-            ParseDatabase(text);
+            string sciezka = ConfigurationManager.AppSettings["ExcelPlik"];
+            if (sciezka.Trim().Length > 0)
+            {
+                ZaladujExcela(sciezka.Trim());
+            }
+            ParseDatabase();
+        }
+
+        private void button1_Click_1(object sender, EventArgs e)
+        {
+            ListaSzablonow szablony = new ListaSzablonow();
+            szablony.Show();
+        }
+
+        private void menuStrip1_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
+        {
+
+        }
+
+        private void Form1_Activated(object sender, EventArgs e)
+        {
+            ParseDatabase();
         }
     }
 }
