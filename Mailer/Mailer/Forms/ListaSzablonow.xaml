@@ -1,0 +1,30 @@
+﻿<Window x:Class="Mailer.Forms.ListaSzablonow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ListaSzablonow" Height="313.882" Width="469.059"
+        ResizeMode="NoResize" Activated="Window_Activated">
+    <Canvas>
+        <Button Content="Zamknij" Canvas.Left="106" Canvas.Top="10" Width="75" RenderTransformOrigin="-1.351,-1" Foreground="#FF574BCB" Click="Button_Click"/>
+        <Button Content="Nowy Szablon" Canvas.Left="215" Canvas.Top="10" Width="94" RenderTransformOrigin="-1.351,-1" Foreground="#FF574BCB" Click="Button_Click_1"/>
+        <Grid Height="100" Canvas.Left="106" Canvas.Top="66" Width="100"/>
+        <DataGrid Name="TemplateGrid" Canvas.Left="10" Canvas.Top="41" Height="235" Width="443"
+                  AutoGenerateColumns="False" SelectionChanged="TemplateGrid_SelectionChanged"
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Binding="{Binding TemplateId}" Header="ID" IsReadOnly="True"
+                                    x:Name="dgrId"/>
+                <DataGridTextColumn Binding="{Binding TemplateName}" IsReadOnly="True" Header="Nazwa Szablonu"
+                                    x:Name="dgrName"/>
+                <DataGridTextColumn Binding="{Binding TemplateText}" IsReadOnly="True" Header="Tekst Szablonu" Width="200"
+                                    x:Name="dgrText"/>
+                <DataGridTemplateColumn>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Usuń" x:Name="btnDelete" Click="btnDelete_Click" Width="80"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Canvas>
+</Window>
